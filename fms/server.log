@@ -1,0 +1,50 @@
+2026/04/13 15:02:35 Starting fms server...
+2026/04/13 15:02:35 File storage initialized in ./data
+2026/04/13 15:02:35 Initializing single event bus...
+2026/04/13 15:02:35 Global event bus started and set.
+2026/04/13 15:02:35 Event system initialized - Lifecycle: true, Conditions: true, Prefix: fms.resource
+[INFO] Registered reconciler for DeviceProfile
+[INFO] Registered reconciler for FirmwareProfile
+[INFO] Registered reconciler for UpdateJob
+[INFO] Registered reconciler for UpdateProfile
+[INFO] Starting reconciliation controller with 5 workers
+[INFO] Reconciliation controller started
+2026/04/13 15:02:35 Reconciliation controller started with 5 workers
+[DEBUG] Worker 0 started
+[DEBUG] Worker 3 started
+[DEBUG] Worker 1 started
+[DEBUG] Worker 4 started
+[DEBUG] Worker 2 started
+2026/04/13 15:02:35 Metrics server starting on :9090
+2026/04/13 15:02:35 Server starting on 0.0.0.0:8080
+2026/04/13 15:02:35 Storage: file backend in ./data
+2026/04/13 15:02:51 "POST http://localhost:8080/updateprofiles HTTP/1.1" from [::1]:49623 - 201 480B in 1.876502ms
+[DEBUG] Processing reconciliation for UpdateProfile/updateprofile-0d68a893 (reason: Event: fms.resource.updateprofile.created)
+[DEBUG] Reconciling UpdateProfile UpdateProfile/updateprofile-0d68a893
+[INFO] UpdateProfile reconciliation not yet implemented for updateprofile-0d68a893
+[DEBUG] Reconciliation successful for UpdateProfile/updateprofile-0d68a893
+2026/04/13 15:03:05 "POST http://localhost:8080/firmwareprofiles HTTP/1.1" from [::1]:49662 - 201 420B in 1.470777ms
+[DEBUG] Processing reconciliation for FirmwareProfile/firmwareprofile-0b2cf39e (reason: Event: fms.resource.firmwareprofile.created)
+[DEBUG] Reconciling FirmwareProfile FirmwareProfile/firmwareprofile-0b2cf39e
+[INFO] FirmwareProfile reconciliation not yet implemented for firmwareprofile-0b2cf39e
+[DEBUG] Reconciliation successful for FirmwareProfile/firmwareprofile-0b2cf39e
+2026/04/13 15:03:16 "POST http://localhost:8080/updatejobs HTTP/1.1" from [::1]:49699 - 201 263B in 1.344572ms
+[DEBUG] Processing reconciliation for UpdateJob/updatejob-afaddcff (reason: Event: fms.resource.updatejob.created)
+[DEBUG] Reconciling UpdateJob UpdateJob/updatejob-afaddcff
+[INFO] Reconciling UpdateJob for FirmwareProfileId: A47_3.70.flash
+[INFO] Would send Redfish payload to targetNode: node-123
+[DEBUG] Reconciliation successful for UpdateJob/updatejob-afaddcff
+2026/04/13 15:03:26 "GET http://localhost:8080/updatejobs HTTP/1.1" from [::1]:49735 - 200 394B in 700.134µs
+[DEBUG] Processing reconciliation for UpdateProfile/updateprofile-0d68a893 (reason: Event: fms.resource.updateprofile.created)
+[DEBUG] Reconciling UpdateProfile UpdateProfile/updateprofile-0d68a893
+[INFO] UpdateProfile reconciliation not yet implemented for updateprofile-0d68a893
+[DEBUG] Reconciliation successful for UpdateProfile/updateprofile-0d68a893
+[DEBUG] Processing reconciliation for FirmwareProfile/firmwareprofile-0b2cf39e (reason: Event: fms.resource.firmwareprofile.created)
+[DEBUG] Reconciling FirmwareProfile FirmwareProfile/firmwareprofile-0b2cf39e
+[INFO] FirmwareProfile reconciliation not yet implemented for firmwareprofile-0b2cf39e
+[DEBUG] Reconciliation successful for FirmwareProfile/firmwareprofile-0b2cf39e
+[DEBUG] Processing reconciliation for UpdateJob/updatejob-afaddcff (reason: Event: fms.resource.updatejob.created)
+[DEBUG] Reconciling UpdateJob UpdateJob/updatejob-afaddcff
+[INFO] Reconciling UpdateJob for FirmwareProfileId: A47_3.70.flash
+[INFO] Would send Redfish payload to targetNode: node-123
+[DEBUG] Reconciliation successful for UpdateJob/updatejob-afaddcff
