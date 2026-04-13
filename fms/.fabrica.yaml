@@ -16,7 +16,7 @@ features:
         enabled: false
     storage:
         enabled: true
-        type: file
+        type: ent
         db_driver: sqlite3
     metrics:
         enabled: true
