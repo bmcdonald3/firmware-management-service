@@ -7,8 +7,9 @@ The Firmware Management Service (FMS) is a demo implementation of a declarative,
 ## Architecture
 
 - **Fabrica-based API server** with CRUD endpoints for DeviceProfile, UpdateProfile, FirmwareProfile, and UpdateJob resources.
-- **Reconciliation framework**: UpdateJob resources are processed by a custom reconciler that simulates the firmware update lifecycle.
-- **File-based storage** for all resources.
+- **Reconciliation framework**: UpdateJob resources are processed by a custom reconciler that performs real Redfish firmware update logic and polling.
+- **Ent database backend** (SQLite by default) for all resources.
+- **Static file server** for firmware binaries at `/firmware-binaries/`.
 - **Metrics** (on port 9090) and **event bus** enabled.
 - **OpenAPI/Swagger** documentation auto-generated.
 
@@ -36,6 +37,19 @@ go run ./cmd/server/
 
 Server starts on `http://localhost:8080`.
 
+### Firmware Binary Hosting
+
+Place firmware files in the `fms/firmware-binaries/` directory. They will be served at `http://localhost:8080/firmware-binaries/<filename>`.
+
+### Environment Variables
+
+Set Redfish credentials as needed (defaults: admin/password):
+
+```sh
+export REDFISH_USER=admin
+export REDFISH_PASS=password
+```
+
 ### API Endpoints
 
 - `POST /deviceprofiles`
@@ -43,6 +57,7 @@ Server starts on `http://localhost:8080`.
 - `POST /firmwareprofiles`
 - `POST /updatejobs`
 - `GET /updatejobs`
+- `GET /firmware-binaries/<filename>`
 
 See [VERIFY.md](../VERIFY.md) for full test plan.
 
@@ -161,17 +176,17 @@ curl http://localhost:8080/updatejobs | jq
 ## What Is Implemented
 
 - All resource types and OpenAPI endpoints
-- Custom reconciliation logic for UpdateJob (simulated job lifecycle)
+- Custom reconciliation logic for UpdateJob (real Redfish update and polling state machine)
+- Ent database backend (SQLite by default)
+- Static file server for firmware binaries
 - Metrics and event bus
-- File-based storage
 - Full test plan from VERIFY.md
 
 ## What Is Left to Implement
 
-- Real device and firmware inventory integration
-- Real Redfish protocol communication
+- Real device and firmware inventory integration (beyond HTTP 200 demo)
+- Advanced Redfish protocol error handling and validation
 - Authentication/authorization
-- Production-grade error handling and validation
 - UI/dashboard
 
 ## Tests Run
@@ -198,9 +213,12 @@ See above for example outputs. The final UpdateJob status:
 ## How It Works
 
 - Users POST resource specs to the API.
-- The reconciler processes UpdateJobs, simulating the firmware update lifecycle.
-- Status fields are updated to reflect job progress.
-- All data is stored in the local file backend.
+- The reconciler processes UpdateJobs, performing real Redfish update logic:
+  - Fetches FirmwareProfile, UpdateProfile, DeviceProfile from storage.
+  - Constructs and sends the Redfish update request, injecting the firmware binary URL.
+  - Polls the device's firmware inventory endpoint until the version matches or timeout.
+  - Updates status fields to reflect job progress.
+- All data is stored in the Ent database backend.
 
 ## Development
 
