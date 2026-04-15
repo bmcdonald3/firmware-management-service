@@ -4,9 +4,7 @@
 
 module github.com/bmcdonald3/firmware-management-service/fms
 
-go 1.24.0
-
-toolchain go1.24.3
+go 1.25.0
 
 require (
 	entgo.io/ent v0.14.6
@@ -16,6 +14,7 @@ require (
 	github.com/openchami/fabrica v0.4.0
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.16.0
+	golang.org/x/crypto v0.50.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -63,9 +62,8 @@ require (
 	github.com/zclconf/go-cty-yaml v1.1.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
-	golang.org/x/mod v0.29.0 // indirect
-	golang.org/x/sys v0.38.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/mod v0.34.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/text v0.36.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 )
