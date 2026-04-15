@@ -1,0 +1,11 @@
+groups:
+    - name: firmware.management.io
+      storageVersion: v1
+      versions:
+        - v1
+      resources:
+        - DeviceProfile
+        - FirmwareManifest
+        - UpdateProfile
+        - UpdateJob
+        - LookupJob
