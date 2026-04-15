@@ -1,0 +1,6 @@
+project_name: fms
+group: firmware.management.io
+storage_type: ent
+db: sqlite
+reconcile: true
+description: "Scaffold created per PLAN.md (manual, fabrica CLI unavailable)"
