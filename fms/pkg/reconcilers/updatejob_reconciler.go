@@ -7,73 +7,106 @@
 package reconcilers
 
 import (
-	"context"
+"context"
+"fmt"
 
-	"github.com/bmcdonald3/fms/apis/firmware.management.io/v1"
+v1 "github.com/bmcdonald3/fms/apis/firmware.management.io/v1"
+"github.com/openchami/fabrica/pkg/fabrica"
 )
 
-// reconcileUpdateJob contains custom reconciliation logic.
-//
-// This method is called by the generated Reconcile() orchestration method.
-// Implement UpdateJob-specific reconciliation logic here.
-//
-// Guidelines:
-//  1. Keep this method idempotent (safe to call multiple times)
-//  2. Update Status fields to reflect observed state
-//  3. Emit events for significant state changes using r.EmitEvent()
-//  4. Use r.Logger for debugging (Infof, Warnf, Errorf, Debugf)
-//  5. Return errors for transient failures (will retry with backoff)
-//  6. Access storage via r.Client (Get, List, Update, Create, Delete)
-//
-// Example implementation patterns:
-//
-// For hardware resources (BMC, Node):
-//   - Connect to hardware endpoint
-//   - Query current state
-//   - Update Status.Connected, Status.Version, Status.Health
-//   - Emit events when state changes
-//
-// For hierarchical resources (Rack, Chassis):
-//   - Create/reconcile child resources
-//   - Update Status with child counts and references
-//   - Emit events when topology changes
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeouts
-//   - res: The UpdateJob resource to reconcile
-//
-// Returns:
-//   - error: If reconciliation failed (will trigger retry with backoff)
+// reconcileUpdateJob is the splitter: for each targetNode in the UpdateJob spec
+// it ensures a child UpdateTask exists, then aggregates child states back to
+// the parent UpdateJob status.
 func (r *UpdateJobReconciler) reconcileUpdateJob(ctx context.Context, res *v1.UpdateJob) error {
-	// TODO: Implement UpdateJob-specific reconciliation logic
-	//
-	// Example:
-	//
-	//   // 1. Read desired state from Spec
-	//   desiredAddress := res.Spec.Address
-	//
-	//   // 2. Observe actual state (e.g., connect to hardware)
-	//   actualState, err := r.observeActualState(ctx, res)
-	//   if err != nil {
-	//       return fmt.Errorf("failed to observe state: %w", err)
-	//   }
-	//
-	//   // 3. Update Status with observed state
-	//   res.Status.Connected = actualState.Connected
-	//   res.Status.Version = actualState.Version
-	//   res.Status.LastSeen = time.Now().Format(time.RFC3339)
-	//
-	//   // 4. Emit events for significant changes
-	//   if !wasConnected && res.Status.Connected {
-	//       eventType := "io.openchami.inventory.updatejobs.connected"
-	//       if err := r.EmitEvent(ctx, eventType, res); err != nil {
-	//           r.Logger.Warnf("Failed to emit event: %v", err)
-	//       }
-	//   }
-	//
-	//   return nil
+r.Logger.Infof("Reconciling UpdateJob %s (nodes=%v)", res.GetUID(), res.Spec.TargetNodes)
 
-	r.Logger.Infof("UpdateJob reconciliation not yet implemented for %s", res.GetUID())
+// --- 1. List all UpdateTasks and filter in-memory (Fabrica has no server-side field filter) ---
+rawItems, err := r.Client.List(ctx, "UpdateTask")
+if err != nil {
+return fmt.Errorf("failed to list UpdateTasks: %w", err)
+}
 
-	return nil
+// Build a set of (updateJobId, targetNode) tuples that already exist.
+type taskKey struct{ jobID, node string }
+existing := make(map[taskKey]bool)
+var childTasks []*v1.UpdateTask
+
+for _, item := range rawItems {
+task, ok := item.(*v1.UpdateTask)
+if !ok {
+continue
+}
+if task.Spec.UpdateJobId == res.GetUID() {
+existing[taskKey{task.Spec.UpdateJobId, task.Spec.TargetNode}] = true
+childTasks = append(childTasks, task)
+}
+}
+
+// --- 2. Create missing UpdateTask resources for each target node ---
+for _, node := range res.Spec.TargetNodes {
+key := taskKey{res.GetUID(), node}
+if existing[key] {
+continue
+}
+
+task := &v1.UpdateTask{
+APIVersion: "firmware.management.io/v1",
+Kind:       "UpdateTask",
+Metadata: fabrica.Metadata{
+Name: fmt.Sprintf("%s-%s", res.Metadata.Name, node),
+},
+Spec: v1.UpdateTaskSpec{
+TargetNode:      node,
+TargetComponent: res.Spec.TargetComponent,
+FirmwareRef:     res.Spec.FirmwareRef,
+UpdateJobId:     res.GetUID(),
+},
+Status: v1.UpdateTaskStatus{
+State: "Pending",
+},
+}
+if err := r.Client.Create(ctx, task); err != nil {
+return fmt.Errorf("failed to create UpdateTask for node %s: %w", node, err)
+}
+r.Logger.Infof("Created UpdateTask %s for node %s", task.Metadata.Name, node)
+childTasks = append(childTasks, task)
+}
+
+// --- 3. Aggregate child states to determine parent UpdateJob phase ---
+total := len(childTasks)
+if total == 0 {
+res.Status.Phase = "Pending"
+res.Status.Message = "No target nodes"
+return r.Client.Update(ctx, res)
+}
+
+counts := map[string]int{"Pending": 0, "Running": 0, "Success": 0, "Failed": 0}
+for _, t := range childTasks {
+state := t.Status.State
+if state == "" {
+state = "Pending"
+}
+counts[state]++
+}
+
+switch {
+case counts["Failed"] > 0:
+res.Status.Phase = "Failed"
+res.Status.Message = fmt.Sprintf("%d/%d tasks failed", counts["Failed"], total)
+case counts["Running"] > 0:
+res.Status.Phase = "Running"
+res.Status.Message = fmt.Sprintf("%d/%d tasks running", counts["Running"], total)
+case counts["Success"] == total:
+res.Status.Phase = "Complete"
+res.Status.Message = "All tasks succeeded"
+default:
+res.Status.Phase = "Pending"
+res.Status.Message = fmt.Sprintf("%d/%d tasks pending", counts["Pending"], total)
+}
+
+if err := r.Client.Update(ctx, res); err != nil {
+return fmt.Errorf("failed to update UpdateJob status: %w", err)
+}
+r.Logger.Infof("UpdateJob %s phase=%s", res.GetUID(), res.Status.Phase)
+return nil
 }

@@ -90,7 +90,7 @@ func DefaultConfig() *Config {
 		IdleTimeout:  60,
 		
 		
-		DatabaseURL:  "file:./data.db?cache=shared&_fk=1",
+		DatabaseURL:  "file:./data.db?cache=shared&_fk=1&_busy_timeout=10000",
 		
 		
 		
@@ -193,10 +193,15 @@ func initConfig() {
 		log.Printf("Using config file: %s", viper.ConfigFileUsed())
 	}
 
-	// Unmarshal config
-	if err := viper.Unmarshal(config); err != nil {
-		log.Fatalf("Unable to decode into config struct: %v", err)
-	}
+// Unmarshal config
+if err := viper.Unmarshal(config); err != nil {
+log.Fatalf("Unable to decode into config struct: %v", err)
+}
+
+// Restore default DSN if viper overwrote it with an empty string.
+if config.DatabaseURL == "" {
+config.DatabaseURL = "file:./data.db?cache=shared&_fk=1&_busy_timeout=10000"
+}
 
 	// Set debug logging
 	if config.Debug {
@@ -240,7 +245,10 @@ func runServer(cmd *cobra.Command, args []string) error {
 	
 // Initialize reconciliation controller with in-memory event bus.
 // Events are handled locally; no external broker is required for local dev.
+// SetGlobalEventBus ensures HTTP handlers' PublishResourceCreated calls
+// route through the same bus that the controller listens on.
 eventBus := events.NewInMemoryEventBus(256, 4)
+events.SetGlobalEventBus(eventBus)
 controller := reconcile.NewController(eventBus, storage.Backend)
 reconcileClient := storage.NewStorageClient()
 if err := reconcilers.RegisterReconcilers(controller, reconcileClient, eventBus); err != nil {

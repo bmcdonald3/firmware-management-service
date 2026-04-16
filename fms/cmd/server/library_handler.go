@@ -17,9 +17,10 @@ import (
 "strings"
 
 "github.com/go-chi/chi/v5"
-"github.com/bmcdonald3/fms/apis/firmware.management.io/v1"
+v1 "github.com/bmcdonald3/fms/apis/firmware.management.io/v1"
 "github.com/bmcdonald3/fms/internal/storage"
 "github.com/bmcdonald3/fms/internal/ziphelper"
+"github.com/openchami/fabrica/pkg/resource"
 "github.com/openchami/fabrica/pkg/fabrica"
 )
 
@@ -107,11 +108,18 @@ http.Error(w, "zip bundle must contain a manifest.json", http.StatusBadRequest)
 return
 }
 
+uid, err := resource.GenerateUIDForResource("FirmwareProfile")
+if err != nil {
+http.Error(w, fmt.Sprintf("failed to generate UID: %v", err), http.StatusInternalServerError)
+return
+}
+
 profile := &v1.FirmwareProfile{
 APIVersion: "firmware.management.io/v1",
 Kind:       "FirmwareProfile",
 Metadata: fabrica.Metadata{
 Name: manifest.Name,
+UID:  uid,
 },
 Spec: v1.FirmwareProfileSpec{
 VersionString:   manifest.VersionString,
