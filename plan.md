@@ -22,10 +22,11 @@ You are an autonomous agent tasked with building the Firmware Management Service
    - **LookupJobStatus:** `state` (oneof=Pending Running Complete Failed), `jobId`, `firmwareData`.
 5. Call `fabrica_generate`.
 6. Run `go mod tidy` and `go run ./cmd/server init-db`.
+7. **Framework Guardrail:** Open `.fabrica.yaml` and `cmd/server/main.go` to ensure API authentication (like Tokensmith) is disabled or bypassed for local development.
 
 ## Step 2: Implement FMLS Binary and ZIP Parsing
 **Description:** Implement the Library Service capabilities.
-1. Create a custom HTTP POST handler in the API layer at `/library/upload`.
+1. **Framework Guardrail (Routing):** Do NOT modify `routes_generated.go`. Instead, open `cmd/server/main.go` and inject a custom HTTP POST handler for `/library/upload` directly onto the `chi.Router` before `http.ListenAndServe` is called.
 2. Accept a `multipart/form-data` ZIP file upload.
 3. Using the provided `zipfiles.go` reference logic, extract the ZIP to `/tmp/firmware/`, parse the internal manifest JSON, and map it to a `FirmwareProfile` struct.
 4. Use `r.Client.Create(ctx, profile)` to automatically generate the database record.
@@ -35,7 +36,7 @@ You are an autonomous agent tasked with building the Firmware Management Service
 **Description:** Write the reconciliation loop in `pkg/reconcilers/updatejob_reconciler.go`.
 1. Fetch the incoming `UpdateJob`.
 2. Iterate over the `spec.targetNodes` array.
-3. For each node, query the database (`r.Client.List`) to check if an `UpdateTask` already exists for this specific `updateJobId` and `targetNode`.
+3. **Framework Guardrail (Filtering):** Fabrica's `r.Client.List` does not natively filter by struct fields. You must call `items, err := r.Client.List(ctx, "UpdateTask")` and manually iterate through `items` in memory to check if an `UpdateTask` already exists for this specific `updateJobId` and `targetNode`.
 4. If it does not exist, use `r.Client.Create()` to instantiate a new `UpdateTask` resource.
 5. Aggregate the status of all child `UpdateTask` resources to determine and update the parent `UpdateJob` status. Call `r.Client.Update(ctx, job)` to persist.
 
@@ -54,8 +55,9 @@ You are an autonomous agent tasked with building the Firmware Management Service
 
 ## Step 6: System Integration and Validation
 **Description:** Verify the system compiles and operates.
-1. Execute `go mod tidy`.
-2. Build the server using `go build -o bin/server ./cmd/server`.
-3. Start the server.
-4. Use `curl` to submit a mock ZIP bundle to the `/library/upload` endpoint. Verify the DB record is created.
-5. Use `curl` to submit an `UpdateJob` targeting multiple nodes. Verify the log output shows the splitter generating child tasks and the task execution loop engaging.
+1. **Framework Guardrail (SQLite Concurrency):** Open `cmd/server/main.go` or `.fabrica.yaml` (wherever the SQLite connection string is defined) and append `?_busy_timeout=10000` to the database URL to prevent `database is locked` panics during concurrent reconciler writes.
+2. Execute `go mod tidy`.
+3. Build the server using `go build -o bin/server ./cmd/server`.
+4. Start the server.
+5. Use `curl` to submit a mock ZIP bundle to the `/library/upload` endpoint. Verify the DB record is created.
+6. Use `curl` to submit an `UpdateJob` targeting multiple nodes. Verify the log output shows the splitter generating child tasks and the task execution loop engaging.
