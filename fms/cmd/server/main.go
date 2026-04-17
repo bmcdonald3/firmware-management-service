@@ -247,11 +247,14 @@ func runServer(cmd *cobra.Command, args []string) error {
 // Events are handled locally; no external broker is required for local dev.
 // SetGlobalEventBus ensures HTTP handlers' PublishResourceCreated calls
 // route through the same bus that the controller listens on.
-eventBus := events.NewInMemoryEventBus(256, 4)
+eventBus := events.NewInMemoryEventBus(1000, 10)
 eventBus.Start()
 defer eventBus.Close()
+
+// Set the global instance so handlers can see it
 events.SetGlobalEventBus(eventBus)
-controller := reconcile.NewController(eventBus, storage.Backend)
+
+controller = reconcile.NewController(eventBus, storage.Backend)
 reconcileClient := storage.NewStorageClient()
 if err := reconcilers.RegisterReconcilers(controller, reconcileClient, eventBus); err != nil {
 return fmt.Errorf("failed to register reconcilers: %w", err)
