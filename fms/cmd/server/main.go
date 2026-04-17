@@ -240,8 +240,13 @@ func runServer(cmd *cobra.Command, args []string) error {
 	
 	
 
+	// Register resource prefixes for UID generation
+	// This is required before any handlers can create resources
+	if err := registerResourcePrefixes(); err != nil {
+		return fmt.Errorf("failed to register resource prefixes: %w", err)
+	}
 	
-
+var controller *reconcile.Controller
 	
 // Initialize reconciliation controller with in-memory event bus.
 // Events are handled locally; no external broker is required for local dev.
@@ -264,11 +269,6 @@ log.Printf("Reconciliation controller started with %d workers", config.Reconcile
 	
 	
 
-	// Register resource prefixes for UID generation
-	// This is required before any handlers can create resources
-	if err := registerResourcePrefixes(); err != nil {
-		return fmt.Errorf("failed to register resource prefixes: %w", err)
-	}
 
 	// Setup router
 	r := chi.NewRouter()

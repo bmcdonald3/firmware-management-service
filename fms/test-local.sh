@@ -1,7 +1,5 @@
 #!/bin/bash
 rm -f data.db
-go run ./cmd/server init-db
-FMS_HOST_IP=172.24.0.1:8081 HPEPASS=initial0 go run ./cmd/server serve --port 8081 > test_server.log 2>&1 &
 SERVER_PID=$!
 sleep 5
 curl -s -X POST http://localhost:8081/deviceprofiles -H "Content-Type: application/json" -d '{"metadata": {"name": "172.24.0.3"}, "spec": {"managementIp": "172.24.0.3", "manufacturer": "generic", "model": "RootService", "redfishPath": "/redfish/v1"}}' > /dev/null
