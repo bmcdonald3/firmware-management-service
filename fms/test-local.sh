@@ -1,5 +1,4 @@
 #!/bin/bash
-rm -f data.db
 SERVER_PID=$!
 sleep 5
 curl -s -X POST http://localhost:8081/deviceprofiles -H "Content-Type: application/json" -d '{"metadata": {"name": "172.24.0.3"}, "spec": {"managementIp": "172.24.0.3", "manufacturer": "generic", "model": "RootService", "redfishPath": "/redfish/v1"}}' > /dev/null
