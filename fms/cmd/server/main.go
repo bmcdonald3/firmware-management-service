@@ -248,6 +248,8 @@ func runServer(cmd *cobra.Command, args []string) error {
 // SetGlobalEventBus ensures HTTP handlers' PublishResourceCreated calls
 // route through the same bus that the controller listens on.
 eventBus := events.NewInMemoryEventBus(256, 4)
+eventBus.Start()
+defer eventBus.Close()
 events.SetGlobalEventBus(eventBus)
 controller := reconcile.NewController(eventBus, storage.Backend)
 reconcileClient := storage.NewStorageClient()
