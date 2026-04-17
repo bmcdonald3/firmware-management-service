@@ -49,12 +49,15 @@ if existing[key] {
 continue
 }
 
+uid, _ := resource.GenerateUIDForResource("UpdateTask")
+
 task := &v1.UpdateTask{
-APIVersion: "firmware.management.io/v1",
-Kind:       "UpdateTask",
-Metadata: fabrica.Metadata{
-Name: fmt.Sprintf("%s-%s", res.Metadata.Name, node),
-},
+    APIVersion: "firmware.management.io/v1",
+    Kind:       "UpdateTask",
+    Metadata: fabrica.Metadata{
+        Name: fmt.Sprintf("%s-%s", res.Metadata.Name, node),
+        UID:  uid,
+    },
 Spec: v1.UpdateTaskSpec{
 TargetNode:      node,
 TargetComponent: res.Spec.TargetComponent,
