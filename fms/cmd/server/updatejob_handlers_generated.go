@@ -159,7 +159,7 @@ func CreateUpdateJob(w http.ResponseWriter, r *http.Request) {
 
 	// Publish resource created event
 
-	if err := events.PublishResourceCreated(r.Context(), "UpdateJob", updateJob.Metadata.UID, updateJob.Metadata.Name, updateJob); err != nil {
+	if err := events.PublishResourceCreated(context.Background(), "UpdateJob", updateJob.Metadata.UID, updateJob.Metadata.Name, updateJob); err != nil {
 		// Log the error but don't fail the request - events are non-critical
 		fmt.Printf("Warning: Failed to publish resource created event for UpdateJob %s: %v\n", updateJob.Metadata.UID, err)
 
