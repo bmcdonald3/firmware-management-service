@@ -1,63 +1,64 @@
-# Firmware Management Service (FMS) Implementation Plan
+# Firmware Management Service (FMS) Logic Implementation Plan
 
-You are an autonomous agent tasked with building the Firmware Management Service. You must execute this plan sequentially. Do not move to the next step until the current step's success criteria are met. 
+You are an autonomous agent tasked with implementing custom business logic for the Firmware Management Service. The base Fabrica framework is already scaffolded. You MUST execute this plan sequentially. **DO NOT move to a subsequent phase until you have successfully executed the validation step for the current phase.**
 
-## Step 1: Initialize Project and Generate Resources via MCP
-**Description:** Use the Fabrica MCP server tools to bootstrap the project. 
-1. Call `fabrica_init` to create a project named `fms`. 
-   - Group: `firmware.management.io`
-   - Storage Type: `ent`
-   - DB: `sqlite`
-   - Enable reconciliation.
-2. Change your working directory to the newly created `fms` folder for all subsequent commands.
-3. Call `fabrica_add_resource` to add the following 6 resources: `DeviceProfile`, `FirmwareProfile`, `UpdateProfile`, `UpdateJob`, `UpdateTask`, `LookupJob`.
-4. Modify the generated `*_types.go` files in `apis/firmware.management.io/v1/` to include these exact fields with `json` and `validate` tags:
-   - **DeviceProfileSpec:** `manufacturer` (req), `model` (req), `redfishPath` (req), `managementIp` (req).
-   - **FirmwareProfileSpec:** `versionString` (req), `versionNumber` (req), `targetComponent` (req), `preConditions`, `postConditions`, `softwareId`.
-   - **UpdateProfileSpec:** `commandType` (req, oneof=Redfish SSH), `payloadPath`, `successCriteria`.
-   - **UpdateJobSpec:** `targetNodes` (array of strings), `targetComponent`, `firmwareRef`, `dryRun` (bool), `force` (bool).
-   - **UpdateTaskSpec:** `targetNode`, `targetComponent`, `firmwareRef`, `updateJobId`.
-   - **UpdateTaskStatus:** `state` (oneof=Pending Running Success Failed), `startTime` (int64), `taskUri`.
-   - **LookupJobSpec:** `targetNode`.
-   - **LookupJobStatus:** `state` (oneof=Pending Running Complete Failed), `jobId`, `firmwareData`.
-5. Call `fabrica_generate`.
-6. Run `go mod tidy` and `go run ./cmd/server init-db`.
-7. **Framework Guardrail:** Open `.fabrica.yaml` and `cmd/server/main.go` to ensure API authentication (like Tokensmith) is disabled or bypassed for local development.
+## Phase 1: Scaffold External Dependencies
+**Goal:** Implement the provided reference snippets from `reference_snippets.md` into the `internal/` directory.
+1. Create `internal/redfish/redfish.go` using the Redfish HTTP Client snippet.
+2. Create `internal/ziphelper/ziphelper.go` using the ZIP Extraction snippet.
+3. Create `internal/hms/hms.go` using the HMS Interface & Mock snippet.
+4. **Validation:** Run `go mod tidy` and `go build ./...`. It must compile without errors.
 
-## Step 2: Implement FMLS Binary and ZIP Parsing
-**Description:** Implement the Library Service capabilities.
-1. **Framework Guardrail (Routing):** Do NOT modify `routes_generated.go`. Instead, open `cmd/server/main.go` and inject a custom HTTP POST handler for `/library/upload` directly onto the `chi.Router` before `http.ListenAndServe` is called.
-2. Accept a `multipart/form-data` ZIP file upload.
-3. Using the provided `zipfiles.go` reference logic, extract the ZIP to `/tmp/firmware/`, parse the internal manifest JSON, and map it to a `FirmwareProfile` struct.
-4. Use `r.Client.Create(ctx, profile)` to automatically generate the database record.
-5. Add a GET handler to serve the extracted `.bin` files from `/tmp/firmware/`.
+## Phase 2: Implement FMLS Binary and ZIP Parsing
+**Goal:** Implement the custom Library Service upload handler.
+1. Inject `r.Post("/library/upload", libraryUploadHandler)` into `cmd/server/main.go` right before `http.ListenAndServe`.
+2. Create `libraryUploadHandler` to accept a zip file, extract it using `ziphelper`, parse `manifest.json`, map it to `v1.FirmwareProfile`, and save it using `storage.SaveFirmwareProfile(r.Context(), profile)`.
+3. Add `r.Get("/library/files/*", ...)` to serve the extracted `/tmp/firmware/` directory.
+4. **Validation:** - Start the server (`CGO_ENABLED=1 go run ./cmd/server serve --database-url="file:data.db?cache=shared&_fk=1" &`).
+   - Create a dummy zip with a dummy `manifest.json`. Use `curl -F "file=@dummy.zip" http://localhost:8080/library/upload`.
+   - Run `curl http://localhost:8080/firmwareprofiles` and assert the database record was created.
+   - Kill the server.
 
-## Step 3: Implement UpdateJob Reconciler (The Splitter)
-**Description:** Write the reconciliation loop in `pkg/reconcilers/updatejob_reconciler.go`.
-1. Fetch the incoming `UpdateJob`.
-2. Iterate over the `spec.targetNodes` array.
-3. **Framework Guardrail (Filtering):** Fabrica's `r.Client.List` does not natively filter by struct fields. You must call `items, err := r.Client.List(ctx, "UpdateTask")` and manually iterate through `items` in memory to check if an `UpdateTask` already exists for this specific `updateJobId` and `targetNode`.
-4. If it does not exist, use `r.Client.Create()` to instantiate a new `UpdateTask` resource.
-5. Aggregate the status of all child `UpdateTask` resources to determine and update the parent `UpdateJob` status. Call `r.Client.Update(ctx, job)` to persist.
+## Phase 3: Implement UpdateJob Reconciler (The Splitter)
+**Goal:** Implement `pkg/reconcilers/updatejob_reconciler.go`.
+1. Ensure idempotency by checking if `res.Status.Phase` is "Complete" or "Failed".
+2. Iterate over `res.Spec.TargetNodes`. For each, check if an `UpdateTask` already exists using `r.Client.List(ctx, "UpdateTask")`.
+3. If not, generate a UID and call `r.Client.Create(ctx, task)` to spawn the child task.
+4. Aggregate child task states to update `res.Status.Phase` and persist via `r.UpdateStatus(ctx, res)`.
+5. **Validation:**
+   - Start the server.
+   - POST an `UpdateJob` targeting `["nodeA", "nodeB"]`.
+   - Wait 3 seconds.
+   - Run `curl http://localhost:8080/updatetasks`. Assert that exactly two tasks were automatically created.
+   - Kill the server.
 
-## Step 4: Implement UpdateTask Reconciler (Execution & HMS)
-**Description:** Write the reconciliation loop in `pkg/reconcilers/updatetask_reconciler.go`. Ensure all external network calls are wrapped in contexts with strict timeouts (e.g., 30s).
-1. **HMS Lock:** Using the provided `hmsInterface.go` logic, execute an HTTP GET to lock the target node. If locked by another service, return `RequeueAfter: 30 * time.Second`.
-2. **Pre-flight:** Check `spec.force`. If false, query the node for its current firmware version. If it matches the target version, set State to `Success`, update DB, and halt.
-3. **Execution:** Using the provided `redfish.go` reference logic, execute a POST to the node's `SimpleUpdate` endpoint. Pass `{"ImageURI": "http://<FMS_HOST_IP>/library/<firmware-file>"}`. Extract the `Location` header from the response, save it to `Status.TaskURI`, set State to `Running`, and update DB.
-4. **Monitoring:** If State is `Running`, GET `Status.TaskURI`. If the task is complete, set State to `Success`. If exception/timeout, set to `Failed`. Persist state changes.
+## Phase 4: Implement UpdateTask Reconciler (Execution)
+**Goal:** Implement `pkg/reconcilers/updatetask_reconciler.go`.
+1. Ensure idempotency (return if "Success" or "Failed").
+2. Initialize `hms.NewLocalHMS()` to get credentials.
+3. Use `redfish.SendSecureRedfish` to POST to the node's `SimpleUpdate` endpoint using the `TargetNode` as the host.
+4. Update `res.Status.TaskUri` and `res.Status.State` based on the Redfish response or connection error. Call `r.UpdateStatus(ctx, res)`.
+5. **Validation:** - Start the server.
+   - POST a single `UpdateTask` manually.
+   - Wait 3 seconds.
+   - GET the task. Assert that its state transitioned to "Failed" (since the target node won't actually exist to receive the Redfish call). This proves the execution loop triggered.
+   - Kill the server.
 
-## Step 5: Implement LookupJob Reconciler
-**Description:** Write the reconciliation loop in `pkg/reconcilers/lookupjob_reconciler.go`.
-1. Fetch the `DeviceProfile` mapped to the `targetNode`.
-2. Execute an HTTP GET to `https://<managementIp>/redfish/v1/UpdateService/FirmwareInventory` using a custom `http.Transport` with `InsecureSkipVerify: true`.
-3. Store the raw JSON response payload into `Status.FirmwareData`, set State to `Complete`, and explicitly persist by calling `r.Client.Update(ctx, job)`.
+## Phase 5: Implement LookupJob Reconciler
+**Goal:** Implement `pkg/reconcilers/lookupjob_reconciler.go`.
+1. Return early if `res.Status.State` is "Complete" or "Failed".
+2. Search `r.Client.List(ctx, "DeviceProfile")` for the target node to get its IP, fallback to `hmsClient.GetDeviceFQDN()`.
+3. Execute an HTTPS GET to the FirmwareInventory endpoint using `InsecureSkipVerify: true`.
+4. Store the raw JSON into `res.Status.FirmwareData`, set State to "Complete" (or "Failed" if dial error), and persist via `r.UpdateStatus(ctx, res)`.
+5. **Validation:**
+   - Start the server.
+   - POST a `LookupJob`. 
+   - Wait 3 seconds.
+   - Assert the state transitioned to "Failed" or "Complete".
+   - Kill the server.
 
-## Step 6: System Integration and Validation
-**Description:** Verify the system compiles and operates.
-1. **Framework Guardrail (SQLite Concurrency):** Open `cmd/server/main.go` or `.fabrica.yaml` (wherever the SQLite connection string is defined) and append `?_busy_timeout=10000` to the database URL to prevent `database is locked` panics during concurrent reconciler writes.
-2. Execute `go mod tidy`.
-3. Build the server using `go build -o bin/server ./cmd/server`.
-4. Start the server.
-5. Use `curl` to submit a mock ZIP bundle to the `/library/upload` endpoint. Verify the DB record is created.
-6. Use `curl` to submit an `UpdateJob` targeting multiple nodes. Verify the log output shows the splitter generating child tasks and the task execution loop engaging.
+## Phase 6: Full System E2E Verification
+**Goal:** Run the full integration test.
+1. Ensure `cmd/server/main.go` has `_busy_timeout=10000` applied to the SQLite connection string to prevent concurrency locks.
+2. Execute the `verify-e2e.sh` script located in the root directory. 
+3. The script must report `✅` for all three logic phases. Fix any bugs indicated by the test script until it passes perfectly.
