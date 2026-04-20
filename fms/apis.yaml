@@ -1,0 +1,12 @@
+groups:
+    - name: example.fabrica.dev
+      storageVersion: v1
+      versions:
+        - v1
+      resources:
+        - DeviceProfile
+        - FirmwareProfile
+        - UpdateProfile
+        - UpdateJob
+        - UpdateTask
+        - LookupJob

@@ -1,0 +1,37 @@
+2026/04/20 13:20:56 Starting fms server...
+2026/04/20 13:20:56 Database schema migrated successfully
+2026/04/20 13:20:56 Ent storage initialized with sqlite3 database
+2026/04/20 13:20:56 Initializing single event bus...
+2026/04/20 13:20:56 Global event bus started and set.
+2026/04/20 13:20:56 Event system initialized - Lifecycle: true, Conditions: true, Prefix: fms.resource
+[INFO] Registered reconciler for DeviceProfile
+[INFO] Registered reconciler for FirmwareProfile
+[INFO] Registered reconciler for LookupJob
+[INFO] Registered reconciler for UpdateJob
+[INFO] Registered reconciler for UpdateProfile
+[INFO] Registered reconciler for UpdateTask
+[INFO] Starting reconciliation controller with 5 workers
+[INFO] Reconciliation controller started
+2026/04/20 13:20:56 Reconciliation controller started with 5 workers
+[DEBUG] Worker 1 started
+[DEBUG] Worker 2 started
+[DEBUG] Worker 0 started
+[DEBUG] Worker 4 started
+[DEBUG] Worker 3 started
+2026/04/20 13:20:56 Server starting on 0.0.0.0:8080
+2026/04/20 13:20:56 Storage: sqlite3 database
+2026/04/20 13:21:00 "POST http://localhost:8080/updatejobs HTTP/1.1" from [::1]:57277 - 201 280B in 3.350328ms
+[DEBUG] Processing reconciliation for UpdateJob/updatejob-663ebf51 (reason: Event: fms.resource.updatejob.created)
+[DEBUG] Reconciling UpdateJob UpdateJob/updatejob-663ebf51
+[INFO] Successfully verified event-driven loop for UpdateJob updatejob-663ebf51
+[DEBUG] Reconciliation successful for UpdateJob/updatejob-663ebf51
+2026/04/20 13:21:05 "GET http://localhost:8080/updatejobs/updatejob-663ebf51 HTTP/1.1" from [::1]:57293 - 200 311B in 686.158µs
+2026/04/20 13:21:25 Server shutting down...
+2026/04/20 13:21:25 Server exited
+[INFO] Stopping reconciliation controller
+[DEBUG] Worker 1 shutting down
+[DEBUG] Worker 0 shutting down
+[DEBUG] Worker 4 shutting down
+[DEBUG] Worker 3 shutting down
+[DEBUG] Worker 2 shutting down
+[INFO] Reconciliation controller stopped
